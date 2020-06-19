@@ -12,8 +12,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 @Disabled("To be executed manually from the IDE")
 @SpringBootTest(
     args = {
-            "--source.root-url=https://[maven-repo]/maven2/[some-path]/",
-            "--mirror-path=./build/mirror/" })
+            "--source.root-url=https://sourcerepo/nexus/content/repositories/my-source-repo/",
+            "--mirror-path=./build/mirror/",
+            "--source.user=source-user",
+            "--source.password=source-pwd",
+            "--target.root-url=https://targetrepo/repository/my-target-repo/",
+            "--target.user=target-user",
+            "--target.password=target-pwd",
+    })
 public class ManualTest {
 
     @Test

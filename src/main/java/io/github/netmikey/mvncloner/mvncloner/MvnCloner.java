@@ -1,6 +1,9 @@
 package io.github.netmikey.mvncloner.mvncloner;
 
+import java.util.Set;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -15,10 +18,21 @@ public class MvnCloner implements CommandLineRunner {
     @Autowired
     private Scraper scraper;
 
+    @Autowired
+    private Publisher publisher;
+
+    @Value("${actions:mirror,publish}")
+    private Set<String> actions;
+
     @Override
     public void run(String... args) throws Exception {
 
-        scraper.scrape();
+        if (actions.contains("mirror")) {
+            scraper.mirror();
+        }
+        if (actions.contains("publish")) {
+            publisher.publish();
+        }
 
         LOG.info("Done.");
     }

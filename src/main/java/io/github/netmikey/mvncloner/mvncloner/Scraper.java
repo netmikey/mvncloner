@@ -3,13 +3,11 @@ package io.github.netmikey.mvncloner.mvncloner;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -54,27 +52,23 @@ public class Scraper {
     @Value("${mirror-path:./mirror/}")
     private String rootMirrorPath;
 
-    public void scrape() throws Exception {
+    public void mirror() throws Exception {
 
         try (final WebClient webClient = new WebClient()) {
             webClient.getOptions().setJavaScriptEnabled(false);
             webClient.getOptions().setCssEnabled(false);
+            Utils.setCredentials(webClient, username, password);
 
-            if (username != null && password != null) {
-                setCredentials(webClient, username, password);
-            }
+            LOG.info("Mirroring from " + rootUrl + " ...");
 
             processIndexUrl(webClient, rootUrl, Paths.get(rootMirrorPath));
+
+            LOG.info("Download complete.");
         }
     }
 
-    private static void setCredentials(WebClient webClient, String username, String password) {
-        byte[] usernameAndPasswordBytes = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
-        String base64encodedUsernameAndPassword = Base64.getEncoder().encodeToString(usernameAndPasswordBytes);
-        webClient.addRequestHeader("Authorization", "Basic " + base64encodedUsernameAndPassword);
-    }
-
-    private void processIndexUrl(WebClient webClient, String pageUrl, Path mirrorPath) throws IOException, URISyntaxException {
+    private void processIndexUrl(WebClient webClient, String pageUrl, Path mirrorPath)
+        throws IOException, URISyntaxException {
         LOG.debug("Switching to mirror directory: " + mirrorPath.toAbsolutePath().toString());
         Files.createDirectories(mirrorPath);
 
@@ -110,7 +104,7 @@ public class Scraper {
             URI base = new URI(pageUrl);
             String relativePath = StringUtils.strip(base.relativize(new URI(fullyQualifiedUrl)).toString(), "/ ");
             LOG.debug("   Recursing into: " + relativePath);
-            sleep(1000);
+            Utils.sleep(1000);
             processIndexUrl(webClient, fullyQualifiedUrl, mirrorPath.resolve(relativePath));
         }
     }
@@ -130,20 +124,12 @@ public class Scraper {
             if (Files.exists(targetFile)) {
                 LOG.debug("      File already exists, skipping download: " + targetFile);
             } else {
-                sleep(500);
+                Utils.sleep(500);
                 LOG.info("      Downloading: " + fullyQualifiedUrl);
                 Page page = webClient.getPage(fullyQualifiedUrl);
                 Files.copy(page.getWebResponse().getContentAsStream(), targetFile);
                 LOG.debug("         ... done.");
             }
-        }
-    }
-
-    private void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            // Don't care.
         }
     }
 }
