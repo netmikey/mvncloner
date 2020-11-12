@@ -34,9 +34,9 @@ public class Scraper {
 
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(Scraper.class);
 
-    private static final Pattern FILE_URL_PATTERN = Pattern.compile("^.*/([^/]+\\.([^\\./]{1,4}))$");
+    private static final Pattern FILE_URL_PATTERN = Pattern.compile("^.*/([^/]+\\.([^\\./]{1,6}))$");
 
-    private static Set<String> EXTENSION_BLACKLIST = new HashSet<>(Arrays.asList("md5", "sha1", "asc"));
+    private static Set<String> EXTENSION_BLACKLIST = new HashSet<>(Arrays.asList("md5", "sha1", "asc", "sha256", "sha512"));
 
     private static Set<String> FILENAME_BLACKLIST = new HashSet<>(Arrays.asList("maven-metadata.xml"));
 
