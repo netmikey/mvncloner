@@ -36,9 +36,11 @@ public class Scraper {
 
     private static final Pattern FILE_URL_PATTERN = Pattern.compile("^.*/([^/]+\\.([^\\./]{1,6}))$");
 
-    private static Set<String> EXTENSION_BLACKLIST = new HashSet<>(Arrays.asList("md5", "sha1", "asc", "sha256", "sha512"));
+    private static Set<String> EXTENSION_BLACKLIST = new HashSet<>(
+        Arrays.asList("md5", "sha1", "asc", "sha256", "sha512"));
 
-    private static Set<String> FILENAME_BLACKLIST = new HashSet<>(Arrays.asList("maven-metadata.xml"));
+    private static Set<String> FILENAME_BLACKLIST = new HashSet<>(
+        Arrays.asList("maven-metadata.xml", "archetype-catalog.xml"));
 
     @Value("${source.root-url}")
     private String rootUrl;
