@@ -1,8 +1,12 @@
 package io.github.netmikey.mvncloner.mvncloner;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.ProxySelector;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -10,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -19,6 +24,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.Page;
+import com.gargoylesoftware.htmlunit.ProxyConfig;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
@@ -59,6 +65,16 @@ public class Scraper {
         try (final WebClient webClient = new WebClient()) {
             webClient.getOptions().setJavaScriptEnabled(false);
             webClient.getOptions().setCssEnabled(false);
+            // Set proxy
+            Optional<Proxy> proxy = ProxySelector.getDefault().select(new URI(rootUrl)).stream().findFirst();
+            proxy.ifPresent(theProxy -> {
+                InetSocketAddress proxyAddress = (InetSocketAddress) theProxy.address();
+                if (proxyAddress != null) {
+                    webClient.getOptions()
+                        .setProxyConfig(new ProxyConfig(proxyAddress.getHostName(), proxyAddress.getPort()));
+                }
+            });
+            // Set credentials
             Utils.setCredentials(webClient, username, password);
 
             LOG.info("Mirroring from " + rootUrl + " ...");
@@ -79,24 +95,32 @@ public class Scraper {
 
         List<String> recurseUrls = new ArrayList<>();
 
+        String pageHost = new URL(pageUrl).getHost();
+
         List<HtmlAnchor> links = page.getAnchors();
         for (HtmlAnchor link : links) {
             String fullyQualifiedUrl = page.getFullyQualifiedUrl(link.getHrefAttribute()).toString();
             LOG.trace("   Found link: " + fullyQualifiedUrl);
-            // Only consider links to artifacts or subdirectories
-            if (fullyQualifiedUrl.startsWith(pageUrl)) {
+            // Avoid crawling out into the open...
+            if (new URL(fullyQualifiedUrl).getHost().equals(pageHost)) {
                 Matcher filePatternMatcher = FILE_URL_PATTERN.matcher(fullyQualifiedUrl);
                 if (filePatternMatcher.matches()) {
                     // Looks like a link to a file
                     handleFileLink(webClient, mirrorPath, filePatternMatcher);
                 } else {
-                    // Looks like a link to another subdrectory: recurse
-                    LOG.trace("      Mark for recursion.");
-                    recurseUrls.add(fullyQualifiedUrl);
+                    // Only consider links to artifacts or subdirectories
+                    if (fullyQualifiedUrl.startsWith(pageUrl)) {
+                        // Looks like a link to another subdrectory: recurse
+                        LOG.trace("      Mark for recursion.");
+                        recurseUrls.add(fullyQualifiedUrl);
+                    } else {
+                        // Looks like a link back or to some completely other
+                        // page: ignore it.
+                        LOG.trace("      Ignoring this link: destination outside of scope.");
+                    }
                 }
             } else {
-                // Looks like a link back or to some completely other page:
-                // ignore it.
+                // Looks like a link to some completely other page: ignore it.
                 LOG.trace("      Ignoring this link: destination outside of scope.");
             }
         }
