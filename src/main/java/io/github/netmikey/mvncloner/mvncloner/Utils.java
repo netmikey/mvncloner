@@ -1,7 +1,14 @@
 package io.github.netmikey.mvncloner.mvncloner;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.http.HttpRequest.Builder;
 import java.nio.charset.StandardCharsets;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 
 import com.gargoylesoftware.htmlunit.WebClient;
@@ -65,5 +72,33 @@ public class Utils {
         } catch (InterruptedException e) {
             // Don't care.
         }
+    }
+
+    public static String computeFileSHA1( File file ) throws IOException
+    {
+        String sha1 = null;
+        MessageDigest digest;
+        try
+        {
+            digest = MessageDigest.getInstance( "SHA-1" );
+        }
+        catch ( NoSuchAlgorithmException e1 )
+        {
+            throw new IOException( "Impossible to get SHA-1 digester", e1 );
+        }
+        try (InputStream input = new FileInputStream( file );
+             DigestInputStream digestStream = new DigestInputStream( input, digest ) )
+        {
+            while(digestStream.read() != -1){
+                // read file stream without buffer
+            }
+            MessageDigest msgDigest = digestStream.getMessageDigest();
+            StringBuilder result = new StringBuilder();
+            for (byte aByte : msgDigest.digest()) {
+                result.append(String.format("%02x", aByte));
+            }
+            sha1 = result.toString();
+        }
+        return sha1;
     }
 }

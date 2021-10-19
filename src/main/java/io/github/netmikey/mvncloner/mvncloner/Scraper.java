@@ -92,14 +92,15 @@ public class Scraper {
             LOG.info("Mirroring from " + rootUrl + " ...");
 
             processIndexUrl(webClient, rootUrl, Paths.get(rootMirrorPath));
-
-            LOG.info("Download complete.");
-            // requestThreadPool.shutdown();
+            requestThreadPool.shutdown();
             try {
-                requestThreadPool.awaitTermination(600L, TimeUnit.SECONDS);
+                // wait for long downloads to finish
+                requestThreadPool.awaitTermination(20L, TimeUnit.MINUTES);
             } catch (InterruptedException e) {
                 LOG.error(e.getMessage());
             }
+
+            LOG.info("Download complete.");
         }
     }
 

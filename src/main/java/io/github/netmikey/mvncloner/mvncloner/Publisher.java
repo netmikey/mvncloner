@@ -52,7 +52,11 @@ public class Publisher {
     public void publish() throws Exception {
         LOG.info("Publishing to " + rootUrl + " ...");
         ThreadPoolExecutor requestThreadPool = (ThreadPoolExecutor)Executors.newFixedThreadPool(this.publisherThreads);
-        HttpClient httpClient = HttpClient.newBuilder().executor(requestThreadPool).build();
+        HttpClient httpClient = HttpClient.newBuilder()
+                .executor(requestThreadPool)
+                .version(HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
         publishDirectory(httpClient, rootUrl, Paths.get(rootMirrorPath).normalize());
         LOG.info("Publishing complete.");
         try {
@@ -95,11 +99,12 @@ public class Publisher {
         LOG.info("Uploading " + targetUrl);
 
 //        Utils.sleep(Long.parseLong(this.sleepTimeInMS));
-        byte[] payload = Files.readAllBytes(path);
+//        byte[] payload = Files.readAllBytes(path);
         HttpRequest request = Utils.setCredentials(HttpRequest.newBuilder(), username, password)
             .uri(URI.create(targetUrl))
-            .timeout(Duration.ofMinutes(2))
-            .PUT(BodyPublishers.ofByteArray(payload))
+            .timeout(Duration.ofMinutes(10))    // for big files... just in case
+            .header("X-Checksum-Sha1", Utils.computeFileSHA1(path.toFile()))
+            .PUT(BodyPublishers.ofFile(path))
             .build();
         httpClient.sendAsync(request, BodyHandlers.ofString())
             .thenApply(HttpResponse::statusCode)
