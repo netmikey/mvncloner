@@ -18,12 +18,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.lang.Runnable;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.lang.RuntimeException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.Page;
+import com.gargoylesoftware.htmlunit.UnexpectedPage;
 import com.gargoylesoftware.htmlunit.ProxyConfig;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
@@ -46,7 +51,8 @@ public class Scraper {
         Arrays.asList("md5", "sha1", "asc", "sha256", "sha512"));
 
     private static Set<String> FILENAME_BLACKLIST = new HashSet<>(
-        Arrays.asList("maven-metadata.xml", "archetype-catalog.xml"));
+        Arrays.asList("maven-metadata.xml", "archetype-catalog.xml", 
+        "nexus-maven-repository-index.gz", "nexus-maven-repository-index.properties"));
 
     @Value("${source.root-url}")
     private String rootUrl;
@@ -57,6 +63,9 @@ public class Scraper {
     @Value("${source.password:#{null}}")
     private String password;
 
+    @Value("${source.scraper-threads:10}")
+    private Integer scraperThreads;
+
     @Value("${mirror-path:./mirror/}")
     private String rootMirrorPath;
 
@@ -66,22 +75,31 @@ public class Scraper {
             webClient.getOptions().setJavaScriptEnabled(false);
             webClient.getOptions().setCssEnabled(false);
             // Set proxy
-            Optional<Proxy> proxy = ProxySelector.getDefault().select(new URI(rootUrl)).stream().findFirst();
-            proxy.ifPresent(theProxy -> {
-                InetSocketAddress proxyAddress = (InetSocketAddress) theProxy.address();
-                if (proxyAddress != null) {
-                    webClient.getOptions()
-                        .setProxyConfig(new ProxyConfig(proxyAddress.getHostName(), proxyAddress.getPort()));
-                }
-            });
+            // Optional<Proxy> proxy = ProxySelector.getDefault().select(new URI(rootUrl)).stream().findFirst();
+            // proxy.ifPresent(theProxy -> {
+            //     InetSocketAddress proxyAddress = (InetSocketAddress) theProxy.address();
+            //     if (proxyAddress != null) {
+            //         webClient.getOptions()
+            //             .setProxyConfig(new ProxyConfig(proxyAddress.getHostName(), proxyAddress.getPort()));
+            //     }
+            // });
             // Set credentials
             Utils.setCredentials(webClient, username, password);
+            ThreadPoolExecutor requestThreadPool = (ThreadPoolExecutor)webClient.getExecutor();
+            requestThreadPool.setCorePoolSize(this.scraperThreads);
+            requestThreadPool.setMaximumPoolSize(this.scraperThreads);
 
             LOG.info("Mirroring from " + rootUrl + " ...");
 
             processIndexUrl(webClient, rootUrl, Paths.get(rootMirrorPath));
 
             LOG.info("Download complete.");
+            // requestThreadPool.shutdown();
+            try {
+                requestThreadPool.awaitTermination(600L, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                LOG.error(e.getMessage());
+            }
         }
     }
 
@@ -91,7 +109,15 @@ public class Scraper {
         Files.createDirectories(mirrorPath);
 
         LOG.debug("Getting source repo URL: " + pageUrl);
-        HtmlPage page = webClient.getPage(pageUrl);
+        Page rawPage = webClient.getPage(pageUrl);
+        HtmlPage page = null;
+        if (!HtmlPage.class.isInstance(rawPage)) {
+            LOG.error("unexpected response from urlL: " + pageUrl.toString());
+            Files.copy(rawPage.getWebResponse().getContentAsStream(), Paths.get("./mirror/wtfisthis"));
+            throw new RuntimeException("got an unexpected Page type: " + page.toString());
+        } else {
+            page = (HtmlPage)rawPage;
+        }
 
         List<String> recurseUrls = new ArrayList<>();
 
@@ -130,7 +156,7 @@ public class Scraper {
             URI base = new URI(pageUrl);
             String relativePath = StringUtils.strip(base.relativize(new URI(fullyQualifiedUrl)).toString(), "/ ");
             LOG.debug("   Recursing into: " + relativePath);
-            Utils.sleep(1000);
+            // Utils.sleep(Long.parseLong(this.sleepTimeInMS));
             processIndexUrl(webClient, fullyQualifiedUrl, mirrorPath.resolve(relativePath));
         }
     }
@@ -148,13 +174,40 @@ public class Scraper {
             // Download file if it doesn't already exist
             Path targetFile = mirrorPath.resolve(filename);
             if (Files.exists(targetFile)) {
-                LOG.debug("      File already exists, skipping download: " + targetFile);
+                LOG.info("      File already exists, skipping download: " + targetFile);
             } else {
-                Utils.sleep(500);
-                LOG.info("      Downloading: " + fullyQualifiedUrl);
-                Page page = webClient.getPage(fullyQualifiedUrl);
+                // Utils.sleep(Long.parseLong(this.sleepTimeInMS));
+                webClient.getExecutor().execute(
+                    new RunnableDownloader(fullyQualifiedUrl, this.username, this.password, targetFile));
+            }
+        }
+    }
+
+    private class RunnableDownloader implements Runnable {
+        private String url = null;
+        private String username = null;
+        private String password = null;
+        private Path targetFile = null;
+
+        public RunnableDownloader(String url, String username, String password, Path targetFile) {
+            this.url = url;
+            this.username = username;
+            this.password = password;
+            this.targetFile = targetFile;
+        }
+
+        public void run() {
+            try (final WebClient webClient = new WebClient()) {
+                LOG.info("      Downloading: " + url);
+                webClient.getOptions().setJavaScriptEnabled(false);
+                webClient.getOptions().setCssEnabled(false);
+                // Set credentials
+                Utils.setCredentials(webClient, username, password);
+                Page page = webClient.getPage(url);
                 Files.copy(page.getWebResponse().getContentAsStream(), targetFile);
                 LOG.debug("         ... done.");
+            } catch (IOException exception) {
+                LOG.error(exception.getMessage());
             }
         }
     }

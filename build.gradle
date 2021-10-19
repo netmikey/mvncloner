@@ -15,7 +15,7 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.apache.commons:commons-lang3:3.10'
-    implementation 'net.sourceforge.htmlunit:htmlunit:2.41.0'
+    implementation 'net.sourceforge.htmlunit:htmlunit:2.53.0'
 
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'

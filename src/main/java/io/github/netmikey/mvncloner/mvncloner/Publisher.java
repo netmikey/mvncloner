@@ -14,6 +14,10 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Duration;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,11 +46,21 @@ public class Publisher {
     @Value("${mirror-path:./mirror/}")
     private String rootMirrorPath;
 
+    @Value("${target.publisher-threads:10}")
+    private Integer publisherThreads;
+
     public void publish() throws Exception {
         LOG.info("Publishing to " + rootUrl + " ...");
-        HttpClient httpClient = HttpClient.newBuilder().build();
+        ThreadPoolExecutor requestThreadPool = (ThreadPoolExecutor)Executors.newFixedThreadPool(this.publisherThreads);
+        HttpClient httpClient = HttpClient.newBuilder().executor(requestThreadPool).build();
         publishDirectory(httpClient, rootUrl, Paths.get(rootMirrorPath).normalize());
         LOG.info("Publishing complete.");
+        try {
+            requestThreadPool.awaitTermination(600L, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            LOG.error(e.getMessage());
+        }
+        requestThreadPool.shutdown();
     }
 
     public void publishDirectory(HttpClient httpClient, String repositoryUrl, Path mirrorPath)
@@ -80,23 +94,17 @@ public class Publisher {
         String targetUrl = repositoryUrl + filename;
         LOG.info("Uploading " + targetUrl);
 
-        Utils.sleep(1000);
+//        Utils.sleep(Long.parseLong(this.sleepTimeInMS));
+        byte[] payload = Files.readAllBytes(path);
         HttpRequest request = Utils.setCredentials(HttpRequest.newBuilder(), username, password)
             .uri(URI.create(targetUrl))
-            .PUT(BodyPublishers.ofInputStream(() -> {
-                try {
-                    return Files.newInputStream(path, StandardOpenOption.READ);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }))
+            .timeout(Duration.ofMinutes(2))
+            .PUT(BodyPublishers.ofByteArray(payload))
             .build();
-        HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
-        if (response.statusCode() < 200 || response.statusCode() > 299) {
-            LOG.error("Error uploading " + targetUrl + " : Response code was " + response.statusCode());
-            LOG.debug("   Response headers: " + response.headers());
-            LOG.debug("   Response body: " + response.body());
-        }
+        httpClient.sendAsync(request, BodyHandlers.ofString())
+            .thenApply(HttpResponse::statusCode)
+            .thenAccept(Publisher::getStatusMessage)
+            .join();
     }
 
     private String appendUrlPathSegment(String baseUrl, String segment) {
@@ -109,5 +117,15 @@ public class Publisher {
         result.append('/');
 
         return result.toString();
+    }
+
+    private static void getStatusMessage(int statusCode) {
+        if (statusCode >= 200 && statusCode <= 299) {
+            LOG.info("Uploaded Successfully!");
+        } else if (statusCode == 403) {
+            LOG.info("Already uploaded");
+        } else {
+            LOG.error("Something bad happened during upload: " + statusCode);
+        }
     }
 }
