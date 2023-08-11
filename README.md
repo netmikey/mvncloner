@@ -31,22 +31,26 @@ Each argument is prepended with "`--`".
 
 * You need at least Java 11 to run the tool.
 * Obviously: read access on the source repository, write access on the target repository.
-* The source maven repository has to provide an "index-like" html view of your repository (successfully tested with Nexus2).
+* The source maven repository has to provide an "index-like" html view of your repository (successfully tested with Nexus2 and Nexus3).
 * The destination repository must accept HTTP PUT requests for storing maven artifacts and accept HTTP Basic authentication (successfully tested with Nexus3).
 
 ### Configuration
 The command-line arguments are as follows (arguments are prepended with "`--`"):
 
 Argument        | Mandatory | Description
-----------------|-----------|---------------
-source.root-url | Yes | The root URL from which the source repository should be scraped.
-source.user     | No  | The username used on the source repository (default: no authentication).
-source.password | No  | The password used on the source repository (default: no authentication).
-mirror-path     | No  | The path on the local file system to be used for mirroring repository content (default: `./mirror/`)
-target.root-url | Yes | The root URL where the content of the mirror repository should be uploaded.
-target.user     | No  | The username used on the target repository (default: no authentication).
-target.password | No  | The password used on the target repository (default: no authentication).
-actions         | No  | Comma-separated list of actions to be performed.<br/>Possible values:<ul><li>**`mirror`:** copy content from the source repository to the `mirror-path` on the local filesystem</li><li>**`publish`:** upload content from the `mirror-path` on the local filesystem to the target repository</li></ul>(default: `mirror,publish`)
+----------------|----------|---------------
+source.root-url          | Yes      | The root URL from which the source repository should be scraped.
+source.user              | No       | The username used on the source repository (default: no authentication).
+source.password          | No       | The password used on the source repository (default: no authentication).
+source.download-interval | No       | The interval between downloads, value in milliseconds, used to reduce load on source-server (default: 1000) 
+mirror-path              | No       | The path on the local file system to be used for mirroring repository content (default: `./mirror/`)
+target.root-url          | Yes      | The root URL where the content of the mirror repository should be uploaded.
+target.user              | No       | The username used on the target repository (default: no authentication).
+target.password          | No       | The password used on the target repository (default: no authentication).
+target.upload-interval   | No       | The interval between uploads, value in milliseconds, used to reduce load on target-server (default: 1000)
+target.concurrent-uploads| No       | Number of parallel uploads, parallelism is only supported on same folder, like foo/bar/artifact/1.0.0/ (default: 2)
+dry-run                  | No       | Boolean value (true or false) that disable write action, but run all read avaliable steps, useful when connections need to be checked without any change (default: false) 
+actions                  | No       | Comma-separated list of actions to be performed.<br/>Possible values:<ul><li>**`mirror`:** copy content from the source repository to the `mirror-path` on the local filesystem</li><li>**`publish`:** upload content from the `mirror-path` on the local filesystem to the target repository</li></ul>(default: `mirror,publish`)
 
 ### Example
 

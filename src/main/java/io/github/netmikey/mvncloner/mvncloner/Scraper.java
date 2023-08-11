@@ -53,7 +53,7 @@ public class Scraper {
     @Value("${mirror-path:./mirror/}")
     private String rootMirrorPath;
 
-    @Value("${source.downloadInterval:500}")
+    @Value("${source.download-interval:1000}")
     private Integer downloadInterval;
 
     public void mirror() throws Exception {

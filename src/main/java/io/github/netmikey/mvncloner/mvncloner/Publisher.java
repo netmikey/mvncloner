@@ -12,8 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Publishes from the mirror directory into a remote target maven repository.
- * 
+ *
  * @author mike
  */
 @Component
@@ -39,31 +39,48 @@ public class Publisher {
     @Value("${target.password:#{null}}")
     private String password;
 
+    @Value("${dry-run:false}")
+    private Boolean dryRun;
+
+    @Value("${target.upload-interval:1000}")
+    private Integer uploadInterval;
+
+	@Value("${target.concurrent-uploads:2}")
+	private Integer concurrentUploads;
+
     @Value("${mirror-path:./mirror/}")
     private String rootMirrorPath;
 
+    private ExecutorService runner ;
+
     public void publish() throws Exception {
+		runner = Executors.newFixedThreadPool(concurrentUploads);
         LOG.info("Publishing to " + rootUrl + " ...");
         HttpClient httpClient = HttpClient.newBuilder().build();
         publishDirectory(httpClient, rootUrl, Paths.get(rootMirrorPath).normalize());
+        runner.shutdown();
         LOG.info("Publishing complete.");
     }
 
     public void publishDirectory(HttpClient httpClient, String repositoryUrl, Path mirrorPath)
-        throws IOException, InterruptedException {
+        throws IOException, ExecutionException, InterruptedException {
 
         LOG.debug("Switching to mirror directory: " + mirrorPath.toAbsolutePath());
 
-        List<Path> recursePaths = new ArrayList<>();
-
+        List<Path> recursePaths = new LinkedList<>();
+        Collection<Future<?>> futures = new HashSet<>();
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(mirrorPath)) {
             for (Path path : stream) {
                 if (Files.isDirectory(path)) {
                     recursePaths.add(path);
                 } else {
-                    handleFile(httpClient, repositoryUrl, path);
+                    futures.add(runner.submit(() -> handleFile(httpClient, repositoryUrl, path)));
                 }
             }
+        }
+
+        for (var future : futures) {
+            future.get();
         }
 
         // Tail recursion
@@ -73,29 +90,35 @@ public class Publisher {
         }
     }
 
-    private void handleFile(HttpClient httpClient, String repositoryUrl, Path path)
-        throws IOException, InterruptedException {
+    private void handleFile(HttpClient httpClient, String repositoryUrl, Path path) {
 
         String filename = path.getFileName().toString();
         String targetUrl = repositoryUrl + filename;
-        LOG.info("Uploading " + targetUrl);
+        try {
+            var baseReq = Utils.setCredentials(HttpRequest.newBuilder(), username, password)
+                .uri(URI.create(targetUrl));
 
-        Utils.sleep(1000);
-        HttpRequest request = Utils.setCredentials(HttpRequest.newBuilder(), username, password)
-            .uri(URI.create(targetUrl))
-            .PUT(BodyPublishers.ofInputStream(() -> {
-                try {
-                    return Files.newInputStream(path, StandardOpenOption.READ);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }))
-            .build();
-        HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
-        if (response.statusCode() < 200 || response.statusCode() > 299) {
-            LOG.error("Error uploading " + targetUrl + " : Response code was " + response.statusCode());
-            LOG.debug("   Response headers: " + response.headers());
-            LOG.debug("   Response body: " + response.body());
+            var getResponse = httpClient.send(baseReq.method("HEAD", BodyPublishers.noBody()).build(), BodyHandlers.discarding());
+            if (getResponse.statusCode() != 404) {
+                LOG.info("Artifact {} already exists", targetUrl);
+                LOG.debug("   Response headers: " + getResponse.headers());
+                return;
+            }
+
+            LOG.info("Uploading " + targetUrl);
+            Utils.sleep(uploadInterval);
+            if (dryRun) return;
+
+            var putRequest = baseReq.PUT(BodyPublishers.ofFile(path)).build();
+
+            HttpResponse<String> putResponse = httpClient.send(putRequest, BodyHandlers.ofString());
+            if (putResponse.statusCode() < 200 || putResponse.statusCode() > 299) {
+                LOG.error("Error uploading " + targetUrl + " : Response code was " + putResponse.statusCode());
+                LOG.debug("   Response headers: " + putResponse.headers());
+                LOG.debug("   Response body: " + putResponse.body());
+            }
+        } catch (Exception e) {
+            LOG.error("Fail to send " + filename + " to " + targetUrl, e);
         }
     }
 
