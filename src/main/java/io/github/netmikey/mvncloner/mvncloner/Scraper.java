@@ -10,12 +10,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,11 +37,9 @@ public class Scraper {
 
     private static final Pattern FILE_URL_PATTERN = Pattern.compile("^.*/([^/]+\\.([^\\./]{1,6}))$");
 
-    private static Set<String> EXTENSION_BLACKLIST = new HashSet<>(
-        Arrays.asList("md5", "sha1", "asc", "sha256", "sha512"));
+    private static final Set<String> EXTENSION_BLACKLIST = Set.of("md5", "sha1", "asc", "sha256", "sha512");
 
-    private static Set<String> FILENAME_BLACKLIST = new HashSet<>(
-        Arrays.asList("maven-metadata.xml", "archetype-catalog.xml"));
+    private static final Set<String> FILENAME_BLACKLIST = Set.of("maven-metadata.xml", "archetype-catalog.xml");
 
     @Value("${source.root-url}")
     private String rootUrl;
@@ -59,6 +52,9 @@ public class Scraper {
 
     @Value("${mirror-path:./mirror/}")
     private String rootMirrorPath;
+
+    @Value("${source.downloadInterval:500}")
+    private Integer downloadInterval;
 
     public void mirror() throws Exception {
 
@@ -93,7 +89,7 @@ public class Scraper {
         LOG.debug("Getting source repo URL: " + pageUrl);
         HtmlPage page = webClient.getPage(pageUrl);
 
-        List<String> recurseUrls = new ArrayList<>();
+        List<String> recurseUrls = new LinkedList<>();
 
         String pageHost = new URL(pageUrl).getHost();
 
@@ -130,7 +126,7 @@ public class Scraper {
             URI base = new URI(pageUrl);
             String relativePath = StringUtils.strip(base.relativize(new URI(fullyQualifiedUrl)).toString(), "/ ");
             LOG.debug("   Recursing into: " + relativePath);
-            Utils.sleep(1000);
+            Utils.sleep(downloadInterval);
             processIndexUrl(webClient, fullyQualifiedUrl, mirrorPath.resolve(relativePath));
         }
     }
@@ -150,7 +146,7 @@ public class Scraper {
             if (Files.exists(targetFile)) {
                 LOG.debug("      File already exists, skipping download: " + targetFile);
             } else {
-                Utils.sleep(500);
+                Utils.sleep(downloadInterval);
                 LOG.info("      Downloading: " + fullyQualifiedUrl);
                 Page page = webClient.getPage(fullyQualifiedUrl);
                 Files.copy(page.getWebResponse().getContentAsStream(), targetFile);
