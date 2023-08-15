@@ -45,16 +45,16 @@ public class Publisher {
     @Value("${target.upload-interval:1000}")
     private Integer uploadInterval;
 
-	@Value("${target.concurrent-uploads:2}")
-	private Integer concurrentUploads;
+    @Value("${target.concurrent-uploads:2}")
+    private Integer concurrentUploads;
 
     @Value("${mirror-path:./mirror/}")
     private String rootMirrorPath;
 
-    private ExecutorService runner ;
+    private ExecutorService runner;
 
     public void publish() throws Exception {
-		runner = Executors.newFixedThreadPool(concurrentUploads);
+        runner = Executors.newFixedThreadPool(concurrentUploads);
         LOG.info("Publishing to " + rootUrl + " ...");
         HttpClient httpClient = HttpClient.newBuilder().build();
         publishDirectory(httpClient, rootUrl, Paths.get(rootMirrorPath).normalize());
