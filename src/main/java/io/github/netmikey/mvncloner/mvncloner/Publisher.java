@@ -42,6 +42,9 @@ public class Publisher {
     @Value("${dry-run:false}")
     private Boolean dryRun;
 
+    @Value("${target.skip-existing:false}")
+    private Boolean skipExisting;
+
     @Value("${target.upload-interval:1000}")
     private Integer uploadInterval;
 
@@ -98,11 +101,13 @@ public class Publisher {
             var baseReq = Utils.setCredentials(HttpRequest.newBuilder(), username, password)
                 .uri(URI.create(targetUrl));
 
-            var getResponse = httpClient.send(baseReq.method("HEAD", BodyPublishers.noBody()).build(), BodyHandlers.discarding());
-            if (getResponse.statusCode() != 404) {
-                LOG.info("Artifact {} already exists", targetUrl);
-                LOG.debug("   Response headers: " + getResponse.headers());
-                return;
+            if (skipExisting) {
+                var getResponse = httpClient.send(baseReq.method("HEAD", BodyPublishers.noBody()).build(), BodyHandlers.discarding());
+                if (getResponse.statusCode() != 404) {
+                    LOG.info("Artifact {} already exists", targetUrl);
+                    LOG.debug("   Response headers: " + getResponse.headers());
+                    return;
+                }
             }
 
             LOG.info("Uploading " + targetUrl);
