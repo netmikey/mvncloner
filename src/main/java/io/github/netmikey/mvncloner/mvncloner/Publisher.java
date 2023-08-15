@@ -45,6 +45,9 @@ public class Publisher {
     @Value("${target.skip-existing:false}")
     private Boolean skipExisting;
 
+    @Value("${target.abort-on-error:true}")
+    private Boolean abortOnError;
+
     @Value("${target.upload-interval:1000}")
     private Integer uploadInterval;
 
@@ -122,13 +125,18 @@ public class Publisher {
                 LOG.debug("   Response headers: " + putResponse.headers());
                 LOG.debug("   Response body: " + putResponse.body());
             }
+        }catch (Error | InterruptedException e){
+            throw new RuntimeException(e);
         } catch (Exception e) {
             LOG.error("Fail to send " + filename + " to " + targetUrl, e);
+            if(abortOnError){
+                throw new RuntimeException(e);
+            }
         }
     }
 
     private String appendUrlPathSegment(String baseUrl, String segment) {
-        StringBuffer result = new StringBuffer(baseUrl);
+        StringBuilder result = new StringBuilder(baseUrl);
 
         if (!baseUrl.endsWith("/")) {
             result.append('/');
