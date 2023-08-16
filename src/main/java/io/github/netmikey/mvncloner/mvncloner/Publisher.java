@@ -11,7 +11,6 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -39,9 +38,6 @@ public class Publisher {
     @Value("${target.password:#{null}}")
     private String password;
 
-    @Value("${dry-run:false}")
-    private Boolean dryRun;
-
     @Value("${target.skip-existing:false}")
     private Boolean skipExisting;
 
@@ -59,8 +55,11 @@ public class Publisher {
 
     private ExecutorService runner;
 
-    public void publish() throws Exception {
+    private Boolean isCheck;
+
+    public void publish(boolean isCheck) throws Exception {
         runner = Executors.newFixedThreadPool(concurrentUploads);
+        this.isCheck = isCheck;
         LOG.info("Publishing to " + rootUrl + " ...");
         HttpClient httpClient = HttpClient.newBuilder().build();
         publishDirectory(httpClient, rootUrl, Paths.get(rootMirrorPath).normalize());
@@ -115,7 +114,7 @@ public class Publisher {
 
             LOG.info("Uploading " + targetUrl);
             Utils.sleep(uploadInterval);
-            if (dryRun) return;
+            if (isCheck) return;
 
             var putRequest = baseReq.PUT(BodyPublishers.ofFile(path)).build();
 

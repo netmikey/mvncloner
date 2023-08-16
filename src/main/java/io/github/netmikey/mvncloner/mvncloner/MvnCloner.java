@@ -26,12 +26,13 @@ public class MvnCloner implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+        var isCheck = actions.contains("check");
 
-        if (actions.contains("mirror")) {
+        if (actions.contains("mirror") || isCheck) {
             scraper.mirror();
         }
-        if (actions.contains("publish")) {
-            publisher.publish();
+        if (actions.contains("publish") || isCheck) {
+            publisher.publish(isCheck);
         }
 
         LOG.info("Done.");

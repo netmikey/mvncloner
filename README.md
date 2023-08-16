@@ -50,9 +50,8 @@ target.password          | No       | The password used on the target repository
 target.upload-interval   | No       | The interval between uploads, value in milliseconds, used to reduce load on target-server (default: 1000)
 target.concurrent-uploads| No       | Number of parallel uploads, parallelism is only supported on same folder, like foo/bar/artifact/1.0.0/ (default: 2)
 target.skip-existing     | No       | Boolean value (true or false) that skip upload of artifacts that already exists (defaults: false)
-target.abort-on-error    | No       | Boolean value (true or false) that stop uploading process when some upload fail (defaults: true)
-dry-run                  | No       | Boolean value (true or false) that disable write action, but run all read avaliable steps, useful when connections need to be checked without any change (default: false) 
-actions                  | No       | Comma-separated list of actions to be performed.<br/>Possible values:<ul><li>**`mirror`:** copy content from the source repository to the `mirror-path` on the local filesystem</li><li>**`publish`:** upload content from the `mirror-path` on the local filesystem to the target repository</li></ul>(default: `mirror,publish`)
+target.abort-on-error    | No       | Boolean value (true or false) that stop uploading process when some upload fail (defaults: true) 
+actions                  | No       | Comma-separated list of actions to be performed.<br/>Possible values:<ul><li>**`mirror`:** copy content from the source repository to the `mirror-path` on the local filesystem</li><li>**`publish`:** upload content from the `mirror-path` on the local filesystem to the target repository</li><li>**`check`:**  disable write action, but run all read avaliable steps, useful when connections need to be checked without any change</li></ul>(default: `mirror,publish`)
 
 ### Example
 
