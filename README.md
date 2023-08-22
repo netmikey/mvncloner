@@ -49,9 +49,9 @@ target.user              | No       | The username used on the target repository
 target.password          | No       | The password used on the target repository (default: no authentication).
 target.upload-interval   | No       | The interval between uploads, value in milliseconds, used to reduce load on target-server (default: 1000)
 target.concurrent-uploads| No       | Number of parallel uploads, parallelism is only supported on same folder, like foo/bar/artifact/1.0.0/ (default: 2)
-target.skip-existing     | No       | Boolean value (true or false) that skip upload of artifacts that already exists (defaults: false)
-target.abort-on-error    | No       | Boolean value (true or false) that stop uploading process when some upload fail (defaults: true) 
-actions                  | No       | Comma-separated list of actions to be performed.<br/>Possible values:<ul><li>**`mirror`:** copy content from the source repository to the `mirror-path` on the local filesystem</li><li>**`publish`:** upload content from the `mirror-path` on the local filesystem to the target repository</li><li>**`check`:**  disable write action, but run all read avaliable steps, useful when connections need to be checked without any change</li></ul>(default: `mirror,publish`)
+target.skip-existing     | No       | Boolean value (`true` or `false`).<p>If set to `true`, skip upload of artifacts that already exist on the target. Setting this to `true` also adds an additionnal http HEAD request before each upload to check whether the file already exists on the target.<p>Setting this to `false` will skip the http HEAD request and will upload every mirrored file regardles of whether it already exists on target. (default: `false`)
+target.abort-on-error    | No       | Boolean value (`true` or `false`).<p>If set to `true`, abort processing immediately when an upload fails. If set to `false`, continue uploading until all mirrored files have been processed, regardless of errors. (default: `true`) 
+actions                  | No       | Comma-separated list of actions to be performed.<br/>Possible values:<ul><li>**`check`:** just check source and target connections by trying to read the repositories' indexes. This is a read-only action and doesn't write anything, neither locally nor rempotely.</li><li>**`mirror`:** copy content from the source repository to the `mirror-path` on the local filesystem</li><li>**`publish`:** upload content from the `mirror-path` on the local filesystem to the target repository</li></ul>(default: `mirror,publish`)
 
 ### Example
 
@@ -68,8 +68,8 @@ This would:
 ## Noteworthy
 
 ### Resumability
-* The mirroring can be resumed later: artifacts already present in the mirror-path won't be downloaded again (no consistency checks are done though!)
-* The upload will not check for already-uploaded artifacts and will always start from the beginning and upload everything.
+* The mirroring can be resumed later: artifacts already present in the mirror-path won't be downloaded again (no consistency checks are done though!).
+* If `target.skip-existing` is set to `true`, the publish action will still run through all mirrored files to check whether they're present on target, but won't re-transfer them if they're already present (no consistency checks are done though!).
 
 ### Publishing path consistency
 You can:
