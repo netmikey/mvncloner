@@ -1,6 +1,7 @@
 package io.github.netmikey.mvncloner.mvncloner;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.ProxySelector;
@@ -57,28 +58,17 @@ public class Scraper {
     private Integer downloadInterval;
 
     public void mirror() throws Exception {
-
-        try (final WebClient webClient = new WebClient()) {
-            webClient.getOptions().setJavaScriptEnabled(false);
-            webClient.getOptions().setCssEnabled(false);
-            // Set proxy
-            Optional<Proxy> proxy = ProxySelector.getDefault().select(new URI(rootUrl)).stream().findFirst();
-            proxy.ifPresent(theProxy -> {
-                InetSocketAddress proxyAddress = (InetSocketAddress) theProxy.address();
-                if (proxyAddress != null) {
-                    webClient.getOptions()
-                        .setProxyConfig(new ProxyConfig(proxyAddress.getHostName(), proxyAddress.getPort()));
-                }
-            });
-            // Set credentials
-            Utils.setCredentials(webClient, username, password);
-
+        Utils.withNewWebClient(rootUrl, username, password, webClient -> {
             LOG.info("Mirroring from " + rootUrl + " ...");
-
-            processIndexUrl(webClient, rootUrl, Paths.get(rootMirrorPath));
-
+            try {
+                processIndexUrl(webClient, rootUrl, Paths.get(rootMirrorPath));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException(e);
+            }
             LOG.info("Download complete.");
-        }
+        });
     }
 
     private void processIndexUrl(WebClient webClient, String pageUrl, Path mirrorPath)

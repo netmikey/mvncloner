@@ -54,36 +54,26 @@ public class Checker {
     }
 
     private void checkSource() {
-        try (final WebClient webClient = new WebClient()) {
-            webClient.getOptions().setJavaScriptEnabled(false);
-            webClient.getOptions().setCssEnabled(false);
-
-            try {
-                // Set proxy
-                Optional<Proxy> proxy = ProxySelector.getDefault().select(new URI(sourceRootUrl)).stream().findFirst();
-                proxy.ifPresent(theProxy -> {
-                    InetSocketAddress proxyAddress = (InetSocketAddress) theProxy.address();
-                    if (proxyAddress != null) {
-                        webClient.getOptions()
-                            .setProxyConfig(new ProxyConfig(proxyAddress.getHostName(), proxyAddress.getPort()));
-                    }
-                });
-                // Set credentials
-                Utils.setCredentials(webClient, sourceUsername, sourcePassword);
-
-                var page = webClient.getPage(sourceRootUrl);
-                LOG.info("Source connection check succeeded! ({}, responded with {})", sourceRootUrl,
-                    page.getWebResponse().getStatusCode());
-            } catch (FailingHttpStatusCodeException e) {
-                throw new IllegalStateException("Connection check failed: source at " + sourceRootUrl
-                    + " responded with http status code " + e.getStatusCode() + ": " + e.getMessage(), e);
-            } catch (MalformedURLException | URISyntaxException e) {
-                throw new IllegalStateException("Connection check failed: malformed source url " + sourceRootUrl
-                    + " caused: " + e.getMessage(), e);
-            } catch (IOException e) {
-                throw new IllegalStateException("Connection check failed: source at " + sourceRootUrl
-                    + " caused IOException: " + e.getMessage(), e);
-            }
+        try {
+            Utils.withNewWebClient(sourceRootUrl, sourceUsername, sourcePassword, webClient -> {
+                try {
+                    var page = webClient.getPage(sourceRootUrl);
+                    LOG.info("Source connection check succeeded! ({}, responded with {})", sourceRootUrl,
+                        page.getWebResponse().getStatusCode());
+                } catch (MalformedURLException e) {
+                    throw new IllegalStateException("Connection check failed: malformed source url " + sourceRootUrl
+                        + " caused: " + e.getMessage(), e);
+                } catch (IOException e) {
+                    throw new IllegalStateException("Connection check failed: source at " + sourceRootUrl
+                        + " caused IOException: " + e.getMessage(), e);
+                } catch (FailingHttpStatusCodeException e) {
+                    throw new IllegalStateException("Connection check failed: source at " + sourceRootUrl
+                        + " responded with http status code " + e.getStatusCode() + ": " + e.getMessage(), e);
+                }
+            });
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException("Connection check failed: malformed source url " + sourceRootUrl
+                + " caused: " + e.getMessage(), e);
         }
     }
 
