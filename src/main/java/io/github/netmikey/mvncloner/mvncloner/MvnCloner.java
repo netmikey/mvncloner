@@ -14,6 +14,9 @@ import org.springframework.stereotype.Component;
 public class MvnCloner implements CommandLineRunner {
 
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(MvnCloner.class);
+    
+    @Autowired
+    private Checker checker;
 
     @Autowired
     private Scraper scraper;
@@ -26,13 +29,14 @@ public class MvnCloner implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        var isCheck = actions.contains("check");
-
-        if (actions.contains("mirror") || isCheck) {
+        if (actions.contains("check")) {
+            checker.check();
+        }
+        if (actions.contains("mirror")) {
             scraper.mirror();
         }
-        if (actions.contains("publish") || isCheck) {
-            publisher.publish(isCheck);
+        if (actions.contains("publish")) {
+            publisher.publish();
         }
 
         LOG.info("Done.");

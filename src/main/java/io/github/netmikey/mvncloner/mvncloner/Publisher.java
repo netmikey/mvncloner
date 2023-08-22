@@ -55,11 +55,8 @@ public class Publisher {
 
     private ExecutorService runner;
 
-    private Boolean isCheck;
-
-    public void publish(boolean isCheck) throws Exception {
+    public void publish() throws Exception {
         runner = Executors.newFixedThreadPool(concurrentUploads);
-        this.isCheck = isCheck;
         LOG.info("Publishing to " + rootUrl + " ...");
         HttpClient httpClient = HttpClient.newBuilder().build();
         publishDirectory(httpClient, rootUrl, Paths.get(rootMirrorPath).normalize());
@@ -114,7 +111,6 @@ public class Publisher {
 
             LOG.info("Uploading " + targetUrl);
             Utils.sleep(uploadInterval);
-            if (isCheck) return;
 
             var putRequest = baseReq.PUT(BodyPublishers.ofFile(path)).build();
 
