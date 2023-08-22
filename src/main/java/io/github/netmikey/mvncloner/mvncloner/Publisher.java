@@ -106,7 +106,7 @@ public class Publisher {
             if (skipExisting) {
                 var getResponse = httpClient.send(baseReq.method("HEAD", BodyPublishers.noBody()).build(),
                     BodyHandlers.discarding());
-                if (getResponse.statusCode() != 404) {
+                if (getResponse.statusCode() == 200) {
                     LOG.info("Artifact {} already exists", targetUrl);
                     LOG.debug("   Response headers: " + getResponse.headers());
                     summary.incrementSkippedAlreadyPresent();
