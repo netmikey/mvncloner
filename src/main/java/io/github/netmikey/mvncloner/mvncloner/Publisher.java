@@ -55,13 +55,16 @@ public class Publisher {
 
     private ExecutorService runner;
 
+    private PublishingSummary summary;
+
     public void publish() throws Exception {
+        summary = new PublishingSummary();
         runner = Executors.newFixedThreadPool(concurrentUploads);
         LOG.info("Publishing to " + rootUrl + " ...");
         HttpClient httpClient = HttpClient.newBuilder().build();
         publishDirectory(httpClient, rootUrl, Paths.get(rootMirrorPath).normalize());
         runner.shutdown();
-        LOG.info("Publishing complete.");
+        LOG.info("Publishing complete. Summary of processed artifacts: " + summary);
     }
 
     public void publishDirectory(HttpClient httpClient, String repositoryUrl, Path mirrorPath)
@@ -101,10 +104,12 @@ public class Publisher {
                 .uri(URI.create(targetUrl));
 
             if (skipExisting) {
-                var getResponse = httpClient.send(baseReq.method("HEAD", BodyPublishers.noBody()).build(), BodyHandlers.discarding());
+                var getResponse = httpClient.send(baseReq.method("HEAD", BodyPublishers.noBody()).build(),
+                    BodyHandlers.discarding());
                 if (getResponse.statusCode() != 404) {
                     LOG.info("Artifact {} already exists", targetUrl);
                     LOG.debug("   Response headers: " + getResponse.headers());
+                    summary.incrementSkippedAlreadyPresent();
                     return;
                 }
             }
@@ -119,12 +124,16 @@ public class Publisher {
                 LOG.error("Error uploading " + targetUrl + " : Response code was " + putResponse.statusCode());
                 LOG.debug("   Response headers: " + putResponse.headers());
                 LOG.debug("   Response body: " + putResponse.body());
+                summary.incrementFailed();
             }
-        }catch (Error | InterruptedException e){
+            summary.incrementPublished();
+        } catch (Error | InterruptedException e) {
+            summary.incrementFailed();
             throw new RuntimeException(e);
         } catch (Exception e) {
-            LOG.error("Fail to send " + filename + " to " + targetUrl, e);
-            if(abortOnError){
+            summary.incrementFailed();
+            LOG.error("Failed to send " + filename + " to " + targetUrl, e);
+            if (abortOnError) {
                 throw new RuntimeException(e);
             }
         }
