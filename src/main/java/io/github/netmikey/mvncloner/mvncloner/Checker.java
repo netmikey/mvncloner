@@ -8,6 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,7 +79,7 @@ public class Checker {
                 .uri(new URI(targetRootUrl));
             var response = httpClient.send(baseReq.method("HEAD", BodyPublishers.noBody()).build(), BodyHandlers.discarding());
 
-            if (response.statusCode() != 200) {
+            if (!List.of(200, 404).contains(response.statusCode())) {
                 throw new IllegalStateException("Connection check failed: target at " + targetRootUrl
                     + " responded with http status code " + response.statusCode());
             }
