@@ -1,8 +1,6 @@
 package io.github.netmikey.mvncloner.mvncloner;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.ProxySelector;
 import java.net.URI;
@@ -13,7 +11,6 @@ import java.util.Base64;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-import com.gargoylesoftware.htmlunit.FailingHttpStatusCodeException;
 import com.gargoylesoftware.htmlunit.ProxyConfig;
 import com.gargoylesoftware.htmlunit.WebClient;
 
